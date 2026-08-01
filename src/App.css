@@ -1,0 +1,135 @@
+:root {
+  color-scheme: light;
+  --ink: #1b1a17;
+  --paper: #faf7f0;
+  --accent: #8a2e2e;
+  --muted: #6b665c;
+  --border: #ddd6c7;
+  font-family: 'Georgia', 'Iowan Old Style', serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+header h1 {
+  font-size: 2.4rem;
+  margin-bottom: 0.25rem;
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  color: var(--muted);
+  margin-top: 0;
+}
+
+main {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+@media (min-width: 720px) {
+  main {
+    grid-template-columns: 260px 1fr;
+    align-items: start;
+  }
+}
+
+.word-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.word-button {
+  width: 100%;
+  text-align: left;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.word-button:hover {
+  border-color: var(--accent);
+}
+
+.word-button--active {
+  border-color: var(--accent);
+  background: #fbeeee;
+}
+
+.word-button .term {
+  font-weight: 700;
+  font-style: italic;
+}
+
+.word-button .hint {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.definition-panel {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem 1.75rem;
+  min-height: 200px;
+}
+
+.definition-panel--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.definition-panel h2 {
+  margin-top: 0;
+  font-style: italic;
+}
+
+.status--error {
+  color: var(--accent);
+}
+
+.entry {
+  margin-bottom: 1rem;
+}
+
+.pos {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.source-link {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
