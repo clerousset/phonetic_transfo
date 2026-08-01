@@ -6,9 +6,11 @@
 
 Site web / outil (React + Vite) versionné avec git.
 
-La page d'accueil propose une liste pré-sélectionnée de mots latins. En cliquant
-sur un mot, sa définition (section latine) est récupérée en direct depuis
-l'API publique de Wiktionary — aucun backend, aucune base de données locale.
+La page d'accueil permet de chercher n'importe quel mot latin (champ de
+recherche) ou d'en choisir un dans une liste d'exemples pré-sélectionnée.
+Dans les deux cas, la définition (section latine) est récupérée en direct
+depuis l'API publique de Wiktionary — aucun backend, aucune base de données
+locale.
 
 ## Structure
 
@@ -20,9 +22,11 @@ ingenium/
 ├── src/
 │   ├── main.jsx
 │   ├── App.jsx / App.css
-│   ├── data/latinWords.js       # liste des mots proposés sur l'accueil
+│   ├── data/latinWords.js       # liste d'exemples proposée sur l'accueil
 │   ├── api/wiktionary.js        # client de l'API REST Wiktionary
-│   └── components/DefinitionPanel.jsx
+│   └── components/
+│       ├── SearchBox.jsx        # champ de recherche libre
+│       └── DefinitionPanel.jsx  # affichage de la définition
 ├── public/
 └── docs/
 ```
