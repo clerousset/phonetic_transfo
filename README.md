@@ -7,10 +7,17 @@
 Site web / outil (React + Vite) versionné avec git.
 
 La page d'accueil permet de chercher n'importe quel mot latin (champ de
-recherche) ou d'en choisir un dans une liste d'exemples pré-sélectionnée.
-Dans les deux cas, la définition (section latine) est récupérée en direct
-depuis l'API publique de Wiktionary — aucun backend, aucune base de données
-locale.
+recherche avec suggestions) ou d'en choisir un dans une liste d'exemples
+pré-sélectionnée. Dans les deux cas, la définition (section latine) est
+récupérée en direct depuis l'API publique de Wiktionary — aucun backend,
+aucune base de données locale.
+
+Les suggestions combinent les mots de la liste d'exemples (correspondance
+locale immédiate) et l'API `opensearch` de Wiktionary (titres de pages
+commençant par ce qui est tapé, avec un léger debounce). Ces suggestions
+réseau ne sont pas filtrées par langue : sélectionner l'une d'elles peut
+mener à un mot sans section latine, auquel cas le message d'erreur habituel
+s'affiche avec un lien vers la page Wiktionary.
 
 ## Structure
 
@@ -23,7 +30,7 @@ ingenium/
 │   ├── main.jsx
 │   ├── App.jsx / App.css
 │   ├── data/latinWords.js       # liste d'exemples proposée sur l'accueil
-│   ├── api/wiktionary.js        # client de l'API REST Wiktionary
+│   ├── api/wiktionary.js        # client REST (définitions) + opensearch (suggestions)
 │   └── components/
 │       ├── SearchBox.jsx        # champ de recherche libre
 │       └── DefinitionPanel.jsx  # affichage de la définition

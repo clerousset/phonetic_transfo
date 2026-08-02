@@ -73,9 +73,14 @@ main {
   gap: 0.4rem;
 }
 
-.search-row input {
+.search-input-wrap {
+  position: relative;
   flex: 1;
   min-width: 0;
+}
+
+.search-input-wrap input {
+  width: 100%;
   padding: 0.5rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -83,7 +88,7 @@ main {
   font-family: inherit;
 }
 
-.search-row input:focus {
+.search-input-wrap input:focus {
   outline: none;
   border-color: var(--accent);
 }
@@ -102,6 +107,42 @@ main {
 .search-row button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: 0 6px 16px rgba(27, 26, 23, 0.1);
+}
+
+.suggestion {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-style: italic;
+  color: var(--ink);
+}
+
+.suggestion:hover,
+.suggestion--active {
+  background: #fbeeee;
 }
 
 .list-label {

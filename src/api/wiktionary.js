@@ -3,6 +3,7 @@
 // Cette API est ouverte en CORS, donc utilisable directement depuis le navigateur, sans backend.
 
 const REST_BASE = 'https://en.wiktionary.org/api/rest_v1/page/definition'
+const ACTION_API = 'https://en.wiktionary.org/w/api.php'
 
 /**
  * Récupère les définitions d'un mot depuis Wiktionary (anglophone).
@@ -38,6 +39,33 @@ export async function fetchLatinDefinition(term) {
       })),
     })),
   }
+}
+
+/**
+ * Suggestions de complétion (titres de pages Wiktionary commençant par `prefix`).
+ * Utilise l'API opensearch de MediaWiki, ouverte en CORS via origin=*.
+ * Ne filtre pas par langue : les suggestions peuvent inclure des mots non latins,
+ * l'appel à fetchLatinDefinition se chargera de signaler l'absence de section latine.
+ *
+ * @param {string} prefix
+ * @param {{ limit?: number, signal?: AbortSignal }} [options]
+ * @returns {Promise<string[]>}
+ */
+export async function fetchTermSuggestions(prefix, { limit = 8, signal } = {}) {
+  const params = new URLSearchParams({
+    action: 'opensearch',
+    format: 'json',
+    origin: '*',
+    namespace: '0',
+    limit: String(limit),
+    search: prefix,
+  })
+
+  const response = await fetch(`${ACTION_API}?${params.toString()}`, { signal })
+  if (!response.ok) return []
+
+  const data = await response.json()
+  return Array.isArray(data) && Array.isArray(data[1]) ? data[1] : []
 }
 
 export function wiktionaryPageUrl(term) {
