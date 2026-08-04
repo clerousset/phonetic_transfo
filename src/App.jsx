@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { LATIN_WORDS } from './data/latinWords.js'
 import { fetchLatinDefinition } from './api/wiktionary.js'
 import DefinitionPanel from './components/DefinitionPanel.jsx'
+import EvolutionPanel from './components/EvolutionPanel.jsx'
 import SearchBox from './components/SearchBox.jsx'
 
 export default function App() {
@@ -55,7 +56,10 @@ export default function App() {
           </ul>
         </div>
 
-        <DefinitionPanel term={selected} status={status} error={error} entries={entries} />
+        <div className="content">
+          <DefinitionPanel term={selected} status={status} error={error} entries={entries} />
+          <EvolutionPanel term={selected} />
+        </div>
       </main>
     </div>
   )
