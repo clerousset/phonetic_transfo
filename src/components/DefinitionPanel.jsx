@@ -1,4 +1,5 @@
 import { wiktionaryPageUrl } from '../api/wiktionary.js'
+import EvolutionPanel from './EvolutionPanel.jsx'
 
 export default function DefinitionPanel({ term, status, error, entries }) {
   if (!term) {
@@ -45,6 +46,8 @@ export default function DefinitionPanel({ term, status, error, entries }) {
           >
             Source : Wiktionary ↗
           </a>
+
+          <EvolutionPanel term={term} />
         </>
       )}
     </div>

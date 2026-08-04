@@ -237,3 +237,65 @@ main {
   font-size: 0.85rem;
   color: var(--accent);
 }
+
+.evolution-panel {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.status--muted {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.evolution-result {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 1.3rem;
+  margin: 0.4rem 0 0.6rem;
+}
+
+.evolution-from {
+  font-style: italic;
+  color: var(--muted);
+}
+
+.evolution-arrow {
+  color: var(--muted);
+}
+
+.evolution-to {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.evolution-steps {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.evolution-steps summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.evolution-steps ol {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.evolution-steps li {
+  margin-bottom: 0.3rem;
+}
+
+.evolution-steps code {
+  background: var(--paper);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+}
+
+.step-meta {
+  color: var(--muted);
+}
