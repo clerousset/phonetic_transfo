@@ -1,28 +1,37 @@
-import { useEffect, useState } from 'react'
-import { evolveLatinWord } from '../engine/latinEvolution.js'
+import { useEffect, useMemo, useState } from 'react'
+import { lookupMarkedForms } from '../engine/latinDictionary.js'
+import { loadRules } from '../engine/latinEvolution.js'
+import { computeChain } from '../engine/soundChange.js'
+import WordNode from './WordNode.jsx'
+import TransformArrow from './TransformArrow.jsx'
 
 export default function EvolutionPanel({ term }) {
-  const [status, setStatus] = useState('idle') // idle | loading | not-found | success
-  const [data, setData] = useState(null)
+  const [status, setStatus] = useState('idle') // idle | loading | not-found | ready
+  const [markedForm, setMarkedForm] = useState(null)
+  const [alternateForms, setAlternateForms] = useState([])
+  const [disabledRuleIds, setDisabledRuleIds] = useState(() => new Set())
 
   useEffect(() => {
     if (!term) {
       setStatus('idle')
-      setData(null)
+      setMarkedForm(null)
       return undefined
     }
 
     let cancelled = false
     setStatus('loading')
-    setData(null)
+    setMarkedForm(null)
+    setDisabledRuleIds(new Set())
 
-    evolveLatinWord(term).then((res) => {
+    lookupMarkedForms(term).then((matches) => {
       if (cancelled) return
-      if (!res.found) {
+      if (!matches || matches.length === 0) {
         setStatus('not-found')
       } else {
-        setData(res)
-        setStatus('success')
+        const [first, ...rest] = matches
+        setMarkedForm(first)
+        setAlternateForms(rest)
+        setStatus('ready')
       }
     })
 
@@ -30,6 +39,24 @@ export default function EvolutionPanel({ term }) {
       cancelled = true
     }
   }, [term])
+
+  const rules = useMemo(() => loadRules(), [])
+
+  const chain = useMemo(() => {
+    if (!markedForm) return null
+    const { result, timeline } = computeChain(markedForm, rules, disabledRuleIds)
+    const lastActiveIndex = timeline.reduce((acc, s, i) => (s.disabled ? acc : i), -1)
+    return { result, timeline, lastActiveIndex }
+  }, [markedForm, rules, disabledRuleIds])
+
+  function toggleRule(ruleId) {
+    setDisabledRuleIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(ruleId)) next.delete(ruleId)
+      else next.add(ruleId)
+      return next
+    })
+  }
 
   if (!term || status === 'idle') return null
 
@@ -46,35 +73,35 @@ export default function EvolutionPanel({ term }) {
         </p>
       )}
 
-      {status === 'success' && data && (
+      {status === 'ready' && chain && (
         <>
-          <p className="evolution-result">
-            <span className="evolution-from">{data.markedForm}</span>
-            <span className="evolution-arrow">→</span>
-            <span className="evolution-to">{data.result}</span>
+          <p className="status status--muted">
+            Cliquez sur une flèche pour annuler (ou rétablir) la règle correspondante — la suite
+            de la chaîne se recalcule automatiquement.
           </p>
 
-          {data.alternateForms.length > 0 && (
-            <p className="status status--muted">
-              Autres formes trouvées pour « {term} » : {data.alternateForms.join(', ')} (non utilisées ici).
-            </p>
-          )}
+          <div className="word-chain">
+            <WordNode word={markedForm} label="latin" final={chain.lastActiveIndex === -1} />
 
-          {data.steps.length > 0 && (
-            <details className="evolution-steps">
-              <summary>Voir les {data.steps.length} étapes appliquées</summary>
-              <ol>
-                {data.steps.map((s, i) => (
-                  <li key={i}>
-                    <code>{s.before}</code> → <code>{s.after}</code>
-                    <span className="step-meta">
-                      {' '}
-                      — {s.explanation} (date {Number.isFinite(s.date) ? s.date : s.date > 0 ? '∞' : '−∞'})
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </details>
+            {chain.timeline.length === 0 && (
+              <p className="status status--muted">Aucune règle applicable à ce mot.</p>
+            )}
+
+            {chain.timeline.map((step, i) => (
+              <div className="chain-link" key={step.ruleId}>
+                <TransformArrow step={step} onToggle={() => toggleRule(step.ruleId)} />
+                {!step.disabled && (
+                  <WordNode word={step.after} final={i === chain.lastActiveIndex} />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {alternateForms.length > 0 && (
+            <p className="status status--muted">
+              Autres formes trouvées pour « {term} » : {alternateForms.join(', ')} (non utilisées
+              ici).
+            </p>
           )}
         </>
       )}

@@ -1,34 +1,24 @@
-// Relie la recherche de mot (dico_latin.csv) au moteur d'évolution phonétique
-// (rulesStress.csv) pour produire, à partir d'un mot latin, sa forme évoluée
-// et le détail des étapes appliquées.
+// Charge et fusionne les deux jeux de règles d'évolution phonétique :
+// rules_latin_phonetic.csv (conversion de l'orthographe latine en réalisation
+// phonétique de départ + accent) puis rulesStress.csv (évolution vers le
+// français). Fusionnées et triées par Date croissante, comme un seul fichier.
+//
+// Chaque règle reçoit un `id` stable (son index dans la liste fusionnée
+// triée), utilisé par l'UI pour savoir quelles règles l'utilisateur a
+// désactivées (voir EvolutionPanel.jsx et engine/soundChange.js#computeChain).
 
-import rulesCsvRaw from '../data/rulesStress.csv?raw'
-import { parseRules, applyRules } from './soundChange.js'
-import { lookupMarkedForms } from './latinDictionary.js'
+import phoneticCsvRaw from '../data/rules_latin_phonetic.csv?raw'
+import stressCsvRaw from '../data/rulesStress.csv?raw'
+import { parseRules } from './soundChange.js'
 
 let rulesCache = null
 
-function getRules() {
-  if (!rulesCache) rulesCache = parseRules(rulesCsvRaw)
-  return rulesCache
-}
-
-/**
- * @param {string} term mot latin tel que recherché sur le site
- * @returns {Promise<
- *   | { found: false }
- *   | { found: true, term: string, markedForm: string, alternateForms: string[],
- *       result: string, steps: ReturnType<typeof applyRules>['steps'] }
- * >}
- */
-export async function evolveLatinWord(term) {
-  const matches = await lookupMarkedForms(term)
-  if (!matches || matches.length === 0) {
-    return { found: false }
+/** @returns {ReturnType<typeof parseRules>} règles fusionnées, triées, avec id */
+export function loadRules() {
+  if (!rulesCache) {
+    rulesCache = [...parseRules(phoneticCsvRaw), ...parseRules(stressCsvRaw)]
+      .sort((a, b) => a.date - b.date)
+      .map((rule, i) => ({ ...rule, id: i }))
   }
-
-  const [markedForm, ...alternateForms] = matches
-  const { result, steps } = applyRules(markedForm, getRules())
-
-  return { found: true, term, markedForm, alternateForms, result, steps }
+  return rulesCache
 }

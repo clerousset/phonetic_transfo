@@ -53,40 +53,61 @@ export function parseRules(csvText) {
 }
 
 /**
- * Applique les règles, dans l'ordre, à `word`. Retourne le mot final ainsi que
- * le détail des étapes où une règle a effectivement modifié le mot.
+ * Applique les règles, dans l'ordre, à `word`, en pouvant désactiver certaines
+ * d'entre elles (par `id`, voir latinEvolution.js). Retourne le mot final ainsi
+ * que la chronologie (`timeline`) des règles qui auraient un effet sur le mot
+ * courant à ce point-là :
+ *
+ * - une règle désactivée dont le Pattern est trouvé apparaît dans la timeline
+ *   avec `disabled: true` et `before`/`after` = ce qu'elle *aurait* produit,
+ *   mais ne change pas le mot courant (la chaîne continue sans elle) ;
+ * - une règle active dont le Pattern est trouvé apparaît avec `disabled: false`,
+ *   et son `after` devient le mot courant pour la suite ;
+ * - une règle (active ou non) dont le Pattern n'est pas trouvé n'apparaît pas
+ *   du tout (elle n'a simplement aucun effet à cette étape).
  *
  * @param {string} word
- * @param {ReturnType<typeof parseRules>} rules
+ * @param {ReturnType<typeof parseRules>} rules règles avec un champ `id`
+ * @param {Set<number>} [disabledIds]
  */
-export function applyRules(word, rules) {
+export function computeChain(word, rules, disabledIds = new Set()) {
   let current = word
-  const steps = []
+  const timeline = []
 
   for (const rule of rules) {
     if (!rule.regex) continue // pattern invalide, ignoré
 
-    let next
+    let candidate
     try {
-      next = current.replace(rule.regex, rule.replacement)
+      candidate = current.replace(rule.regex, rule.replacement)
     } catch {
       continue
     }
 
-    if (next !== current) {
-      steps.push({
-        date: rule.date,
-        pattern: rule.pattern,
-        replacement: rule.replacement,
-        explanation: rule.explanation,
-        before: current,
-        after: next,
-      })
-      current = next
-    }
+    if (candidate === current) continue // aucun effet ici, pas affiché
+
+    const disabled = disabledIds.has(rule.id)
+    timeline.push({
+      ruleId: rule.id,
+      date: rule.date,
+      pattern: rule.pattern,
+      replacement: rule.replacement,
+      explanation: rule.explanation,
+      before: current,
+      after: candidate,
+      disabled,
+    })
+
+    if (!disabled) current = candidate
   }
 
-  return { result: current, steps }
+  return { result: current, timeline }
+}
+
+/** Compatibilité : applique toutes les règles (aucune désactivée). */
+export function applyRules(word, rules) {
+  const { result, timeline } = computeChain(word, rules)
+  return { result, steps: timeline }
 }
 
 /** Règles dont le Pattern n'a pas pu être compilé en regex JS (pour diagnostic). */
