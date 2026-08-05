@@ -296,10 +296,50 @@ main {
   color: var(--accent);
 }
 
-.chain-link {
+.chain-segment {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+}
+
+.chain-fork-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.fork-note {
+  margin: 0.4rem 0 0.5rem 0.6rem;
+}
+
+.chain-fork {
+  display: flex;
+  flex-direction: row;
+  gap: 1.5rem;
+  align-items: flex-start;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.chain-branch {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 0 0 auto;
+  min-width: 220px;
+  padding: 0.5rem 0.75rem;
+  border-left: 2px dashed var(--border);
+}
+
+.branch-label {
+  margin: 0 0 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
 }
 
 .transform {

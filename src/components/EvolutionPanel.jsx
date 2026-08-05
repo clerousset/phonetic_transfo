@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { lookupMarkedForms } from '../engine/latinDictionary.js'
 import { loadRules } from '../engine/latinEvolution.js'
-import { computeChain } from '../engine/soundChange.js'
+import { buildChainTree } from '../engine/soundChange.js'
 import WordNode from './WordNode.jsx'
-import TransformArrow from './TransformArrow.jsx'
+import ChainTreeView from './ChainTreeView.jsx'
 
 export default function EvolutionPanel({ term }) {
   const [status, setStatus] = useState('idle') // idle | loading | not-found | ready
@@ -42,11 +42,9 @@ export default function EvolutionPanel({ term }) {
 
   const rules = useMemo(() => loadRules(), [])
 
-  const chain = useMemo(() => {
+  const tree = useMemo(() => {
     if (!markedForm) return null
-    const { result, timeline } = computeChain(markedForm, rules, disabledRuleIds)
-    const lastActiveIndex = timeline.reduce((acc, s, i) => (s.disabled ? acc : i), -1)
-    return { result, timeline, lastActiveIndex }
+    return buildChainTree(markedForm, rules, disabledRuleIds)
   }, [markedForm, rules, disabledRuleIds])
 
   function toggleRule(ruleId) {
@@ -73,28 +71,17 @@ export default function EvolutionPanel({ term }) {
         </p>
       )}
 
-      {status === 'ready' && chain && (
+      {status === 'ready' && tree && (
         <>
           <p className="status status--muted">
             Cliquez sur une flèche pour annuler (ou rétablir) la règle correspondante — la suite
-            de la chaîne se recalcule automatiquement.
+            se recalcule automatiquement. Quand des règles de même date divergent selon l'ordre,
+            la chaîne se divise.
           </p>
 
           <div className="word-chain">
-            <WordNode word={markedForm} label="latin" final={chain.lastActiveIndex === -1} />
-
-            {chain.timeline.length === 0 && (
-              <p className="status status--muted">Aucune règle applicable à ce mot.</p>
-            )}
-
-            {chain.timeline.map((step, i) => (
-              <div className="chain-link" key={step.ruleId}>
-                <TransformArrow step={step} onToggle={() => toggleRule(step.ruleId)} />
-                {!step.disabled && (
-                  <WordNode word={step.after} final={i === chain.lastActiveIndex} />
-                )}
-              </div>
-            ))}
+            <WordNode word={markedForm} label="latin" final={tree.isLeaf} />
+            <ChainTreeView node={tree} onToggle={toggleRule} />
           </div>
 
           {alternateForms.length > 0 && (
