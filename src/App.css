@@ -296,6 +296,30 @@ main {
   color: var(--accent);
 }
 
+.word-node-play {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0.1rem 0.2rem;
+  border-radius: 4px;
+  color: var(--muted);
+}
+
+.word-node-play:hover {
+  color: var(--accent);
+}
+
+.word-node-play:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.word-node-play--error {
+  color: var(--accent);
+}
+
 .chain-segment {
   display: flex;
   flex-direction: column;
