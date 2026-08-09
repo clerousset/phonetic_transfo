@@ -51,8 +51,8 @@ export default function ChainTreeView({ node, onToggle }) {
         )}
         {node.truncatedFork && (
           <p className="status status--muted">
-            Cette date aurait aussi divergé selon l'ordre, mais le nombre de branches déjà
-            affichées est limité : un seul résultat est montré ici.
+            Cette étape aurait aussi bifurqué, mais le nombre de branches déjà affichées est
+            limité : une seule possibilité est montrée ici.
           </p>
         )}
         <WordNode word={node.next.word} final={node.next.isLeaf} />
@@ -65,13 +65,12 @@ export default function ChainTreeView({ node, onToggle }) {
     <div className="chain-fork-wrapper">
       {cancelledArrows}
       <p className="status status--muted fork-note">
-        Ces règles partagent la même date et leur ordre change le résultat — {node.branches.length}{' '}
-        possibilités :
+        {node.branches.length} possibilités à cette étape :
       </p>
       <div className="chain-fork">
         {node.branches.map((branch, i) => (
           <div className="chain-branch" key={i}>
-            <p className="branch-label">Ordre {i + 1}</p>
+            <p className="branch-label">Possibilité {i + 1}</p>
             {branch.steps.map((step) => (
               <TransformArrow
                 key={step.ruleId}

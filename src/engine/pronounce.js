@@ -31,7 +31,7 @@ async function runEspeak(args) {
  *   plus naturel pour un résultat évolué vers le français, à essayer).
  * @returns {Promise<void>} résolue quand la lecture est terminée.
  */
-export async function pronounce(word, { voice = 'en-us' } = {}) {
+export async function pronounce(word, { voice = 'fr-fr' } = {}) {
   const phonemes = toKirshenbaumPhonemes(word)
   if (!phonemes) {
     throw new Error(`Aucun phonème reconnu dans « ${word} ».`)

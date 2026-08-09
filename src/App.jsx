@@ -3,6 +3,7 @@ import { LATIN_WORDS } from './data/latinWords.js'
 import { fetchLatinDefinition } from './api/wiktionary.js'
 import DefinitionPanel from './components/DefinitionPanel.jsx'
 import EvolutionPanel from './components/EvolutionPanel.jsx'
+import ReconstructionPanel from './components/ReconstructionPanel.jsx'
 import SearchBox from './components/SearchBox.jsx'
 
 export default function App() {
@@ -61,6 +62,8 @@ export default function App() {
           <EvolutionPanel term={selected} />
         </div>
       </main>
+
+      <ReconstructionPanel />
     </div>
   )
 }

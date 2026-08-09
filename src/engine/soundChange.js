@@ -36,7 +36,8 @@ export function parseRules(csvText) {
   return rows
     .map((row) => {
       const pattern = row.Pattern ?? ''
-      const replacement = toJsReplacement(row.Replacement ?? '')
+      const rawReplacement = row.Replacement ?? ''
+      const replacement = toJsReplacement(rawReplacement)
       const explanation = row.Explanation ?? ''
       const date = parseDate(row.Date)
 
@@ -47,7 +48,7 @@ export function parseRules(csvText) {
         regex = null
       }
 
-      return { pattern, replacement, explanation, date, regex }
+      return { pattern, rawReplacement, replacement, explanation, date, regex }
     })
     .sort((a, b) => a.date - b.date)
 }
