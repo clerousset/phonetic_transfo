@@ -255,6 +255,93 @@ main {
   margin-top: 2rem;
 }
 
+.evolution-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.variant-switch {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.variant-button {
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: white;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+}
+
+.variant-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.variant-button--active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+.manual-form-entry form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-width: 420px;
+  margin-top: 0.75rem;
+}
+
+.vowel-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+
+.vowel-keyboard-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.vowel-keyboard-label {
+  width: 3.6rem;
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.vowel-key {
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: white;
+  color: var(--ink);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-style: italic;
+  line-height: 1;
+  padding: 0;
+}
+
+.vowel-key:hover {
+  border-color: var(--accent);
+  background: #fbeeee;
+  color: var(--accent);
+}
+
 .reconstruction-panel .search-box {
   max-width: 420px;
   margin: 0.75rem 0 0.5rem;
