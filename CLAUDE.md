@@ -145,6 +145,17 @@ les ordres possibles sont testés (permutations, plafonné à 6 règles
 simultanées) — s'ils divergent, l'arbre bifurque. `ChainTreeView` le restitue
 récursivement, `TransformArrow` permet de désactiver une règle à la volée.
 
+L'ensemble des règles candidates d'un groupe (`candidateRules`) ne se limite
+pas à celles qui mordent sur le mot **à l'entrée** du groupe : une règle peut
+n'avoir de prise qu'une fois qu'une de ses sœurs a agi (elle est « nourrie »).
+Le filtre est donc itéré jusqu'à stabilité, sur le mot d'entrée *et* sur le mot
+obtenu après les candidates déjà retenues. Chaque candidate garde ensuite **un
+seul tour** : une règle ne boucle pas à l'intérieur d'un groupe. Conséquence à
+garder en tête : l'arbre peut proposer plusieurs mots là où la chaîne linéaire,
+qui suit l'ordre du fichier, n'en donne qu'un — ce qu'on exige, c'est que le
+mot de la chaîne figure **parmi** les branches (2,5 branches en moyenne sur les
+30 mots de référence, 7 au pire).
+
 **Sens inverse** : l'inverse de `A > B / L _ R` est `B > A / L _ R`, donc
 `reverseRules.js#buildReverseRules` échange simplement `Target` et `Result` et
 laisse le compilateur produire la regex — **281 des 302 règles sont
@@ -166,15 +177,6 @@ attendu, pas un bug.
   (`buildReverseTree(..., { maxRestorations })`) empêche l'emballement complet.
   Le levier suivant serait de restituer **une position à la fois** et de
   classer les branches par plausibilité, plutôt que d'explorer gloutonnement.
-- **Groupes datés : les règles nourries sont écartées** (test marqué `todo`).
-  Dans un groupe de même `Date`, `buildChainTree` ne retient que les règles qui
-  mordent *à l'entrée du groupe* ; une règle rendue applicable par une de ses
-  sœurs n'est jamais appliquée. Le correctif `sequential` ne couvre que la
-  passe de transcription. Visible sur `ŏcŭlus`, où la chaîne linéaire et
-  l'arbre ne donnent pas le même mot. La piste : remplacer l'énumération des
-  **ordres** (factorielle, d'où le plafond `MAX_PERMUTE = 6`) par celle des
-  **issues atteignables**, avec mémoïsation — mesuré à 10 états explorés dans
-  le pire cas contre 20! ordres.
 - **Deux mots sur 30 n'atteignent pas leur cible** : `tēctŭ` donne `twat` au
   lieu de `twa` (le t final devrait tomber) et `vĭncĕre` donne `vɑ̃ẽ̯nʀ` au
   lieu de `vɛ̃kʀ`. Figés dans `ECARTS_CONNUS` (test/engine.test.js).

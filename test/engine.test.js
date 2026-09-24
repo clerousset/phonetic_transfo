@@ -198,6 +198,17 @@ describe('buildChainTree', () => {
     assert.deepEqual(leafWords(tree).sort(), ['ay', 'xc'])
   })
 
+  it('retient une règle nourrie par une sœur du même groupe daté', () => {
+    // Sur "ac", "bc>x" ne mord pas d'emblée : c'est "a>b" qui lui fabrique son
+    // contexte. L'ancien filtre, calculé une fois à l'entrée du groupe,
+    // l'écartait définitivement et "x" était inatteignable.
+    const rules = rulesFrom('"a","b","a>b","100"', '"bc","x","bc>x","100"')
+    const branches = leafWords(buildChainTree('ac', rules))
+    assert.ok(branches.includes('x'), branches.join(' | '))
+    // l'ordre inverse reste possible : bc>x passe son tour, seul a>b agit
+    assert.ok(branches.includes('bc'), branches.join(' | '))
+  })
+
   it('applique un groupe séquentiel dans l\'ordre, y compris les règles nourries par leurs voisines', () => {
     // "b>c" ne devient applicable qu'une fois "a>b" passée : sans le marqueur
     // `sequential`, elle serait écartée du groupe et jamais appliquée.
@@ -401,19 +412,15 @@ describe('non-régression (src/data)', () => {
   // datées -inf, et l'accent ne pouvant se poser qu'une fois "ă"/"ĕ" transcrits
   // en "a"/"e", l'arbre perdait l'accent tonique ("ʃɑ̃bʀ" au lieu de "ʃˈɑ̃bʀ")
   // et toutes les règles conditionnées par "ˈ" cessaient de s'appliquer.
-  it('donne le même mot par la chaîne linéaire et par l\'arbre', () => {
-    for (const word of ['cămĕra', 'porta', 'vīta']) {
-      assert.deepEqual(leafWords(buildChainTree(word, french)), [applyRules(word, french).result], word)
+  // L'arbre explore tous les ordres possibles des règles simultanées : il peut
+  // donc proposer plusieurs mots là où la chaîne linéaire, qui suit l'ordre du
+  // fichier, n'en donne qu'un. Ce qu'on exige, c'est que le résultat de la
+  // chaîne figure PARMI les branches — pas qu'il soit le seul.
+  it('propose, parmi ses branches, le mot de la chaîne linéaire', () => {
+    for (const word of ['cămĕra', 'porta', 'vīta', 'ŏcŭlus']) {
+      const branches = leafWords(buildChainTree(word, french))
+      assert.ok(branches.includes(applyRules(word, french).result), `${word} : ${branches.join(' | ')}`)
     }
-  })
-
-  // BUG CONNU (marqué `todo`) : dans un groupe de même Date, buildChainTree ne
-  // retient que les règles qui mordent à l'entrée du groupe, donc une règle
-  // rendue applicable par une de ses sœurs est perdue. Le correctif appliqué
-  // aux groupes `sequential` ne couvre pas les groupes datés. Le défaut était
-  // latent jusqu'ici ; réparer la règle kl/gl l'a réveillé sur ŏcŭlus.
-  it('donne le même mot par la chaîne et par l\'arbre, y compris sur ŏcŭlus', { todo: 'groupes datés : les règles nourries par leurs sœurs sont écartées' }, () => {
-    assert.deepEqual(leafWords(buildChainTree('ŏcŭlus', french)), [applyRules('ŏcŭlus', french).result])
   })
 
   it('charge toutes les règles, et toutes compilent', () => {

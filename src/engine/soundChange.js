@@ -139,6 +139,65 @@ function safeApply(word, rule) {
   }
 }
 
+/**
+ * Règles d'un groupe susceptibles d'agir sur `word`.
+ *
+ * On ne peut pas se contenter de celles qui mordent sur le mot À L'ENTRÉE du
+ * groupe : une règle peut n'avoir de prise qu'une fois qu'une de ses sœurs a
+ * agi (elle est « nourrie »). L'ancien filtre, calculé une seule fois, les
+ * écartait définitivement — aucun ordre ne pouvait plus les inclure. On avance
+ * donc le mot au fur et à mesure pour découvrir ces règles-là aussi.
+ *
+ * Les candidates gardent ensuite le modèle habituel : chacune a UN tour, et on
+ * teste les ordres. Une règle ne s'applique donc pas en boucle à l'intérieur
+ * d'un même groupe.
+ */
+function candidateRules(word, rules) {
+  const chosenIds = new Set()
+
+  for (;;) {
+    // mot obtenu en appliquant les candidates déjà retenues : c'est lui qui
+    // révèle les règles nourries
+    const probe = stepsInOrder(word, rules.filter((rule) => chosenIds.has(rule.id))).word
+    let added = false
+
+    for (const rule of rules) {
+      if (chosenIds.has(rule.id)) continue
+      const mordAEntree = safeApply(word, rule) !== word
+      const mordApres = safeApply(probe, rule) !== probe
+      if (mordAEntree || mordApres) {
+        chosenIds.add(rule.id)
+        added = true
+      }
+    }
+
+    if (!added) return rules.filter((rule) => chosenIds.has(rule.id)) // ordre du fichier
+  }
+}
+
+/**
+ * Énumère les mots atteignables en donnant son tour à chaque règle candidate,
+ * dans tous les ordres possibles. Les ordres qui convergent sont fusionnés.
+ */
+function reachableOutcomes(word, rules, maxOrders) {
+  const candidates = candidateRules(word, rules)
+  if (candidates.length === 0) return { outcomes: new Map(), truncated: false }
+
+  if (candidates.length > maxOrders) {
+    // trop de règles pour explorer les ordres : on applique dans l'ordre du
+    // fichier, en signalant que les autres ordres n'ont pas été testés
+    const { word: finalWord, steps } = stepsInOrder(word, candidates)
+    return { outcomes: new Map([[finalWord, steps]]), truncated: true }
+  }
+
+  const outcomes = new Map()
+  for (const order of permutations(candidates)) {
+    const { word: finalWord, steps } = stepsInOrder(word, order)
+    if (!outcomes.has(finalWord)) outcomes.set(finalWord, steps)
+  }
+  return { outcomes, truncated: false }
+}
+
 function permutations(items) {
   if (items.length <= 1) return [items]
   const result = []
@@ -184,7 +243,9 @@ function stepsInOrder(word, orderedRules) {
   return { word: current, steps }
 }
 
-const MAX_PERMUTE = 6 // au-delà, on n'explore pas tous les ordres (factorielle)
+// Au-delà de ce nombre de règles candidates dans un même groupe, on renonce à
+// tester les ordres (factorielle) et on applique dans l'ordre du fichier.
+const DEFAULT_MAX_SIMULTANEOUS = 6
 const DEFAULT_MAX_EXTRA_BRANCHES = 8 // garde-fou contre l'explosion combinatoire
 
 /**
@@ -204,11 +265,12 @@ const DEFAULT_MAX_EXTRA_BRANCHES = 8 // garde-fou contre l'explosion combinatoir
  * @param {string} word
  * @param {ReturnType<typeof parseRules>} rules règles avec un champ `id`
  * @param {Set<number>} [disabledIds]
- * @param {{ maxExtraBranches?: number }} [options]
+ * @param {{ maxExtraBranches?: number, maxSimultaneous?: number }} [options]
  */
 export function buildChainTree(word, rules, disabledIds = new Set(), options = {}) {
   const groups = groupRulesByDate(rules)
   const branchBudget = { remaining: options.maxExtraBranches ?? DEFAULT_MAX_EXTRA_BRANCHES }
+  const maxSimultaneous = options.maxSimultaneous ?? DEFAULT_MAX_SIMULTANEOUS
 
   function recurse(currentWord, groupIndex) {
     const word = currentWord
@@ -250,28 +312,9 @@ export function buildChainTree(word, rules, disabledIds = new Set(), options = {
         }
       }
 
-      const matching = enabled.filter((r) => safeApply(word, r) !== word)
-      if (matching.length === 0) continue // rien ici, groupe de date suivant
-
-      if (matching.length === 1 || matching.length > MAX_PERMUTE) {
-        const { word: nextWord, steps } = stepsInOrder(word, matching)
-        return {
-          word,
-          cancelled,
-          isLeaf: false,
-          forked: false,
-          tooManySimultaneous: matching.length > MAX_PERMUTE,
-          steps,
-          next: recurse(nextWord, gi + 1),
-        }
-      }
-
-      // 2..MAX_PERMUTE règles simultanées : teste tous les ordres possibles
-      const outcomes = new Map()
-      for (const perm of permutations(matching)) {
-        const { word: finalWord, steps } = stepsInOrder(word, perm)
-        if (!outcomes.has(finalWord)) outcomes.set(finalWord, steps)
-      }
+      const { outcomes, truncated } = reachableOutcomes(word, enabled, maxSimultaneous)
+      // une seule issue identique au mot d'entrée = ce groupe n'a rien fait
+      if (outcomes.size === 0 || (outcomes.size === 1 && outcomes.has(word))) continue
 
       if (outcomes.size === 1) {
         const [[finalWord, steps]] = outcomes.entries()
@@ -280,6 +323,7 @@ export function buildChainTree(word, rules, disabledIds = new Set(), options = {
           cancelled,
           isLeaf: false,
           forked: false,
+          tooManySimultaneous: truncated,
           steps,
           next: recurse(finalWord, gi + 1),
         }
@@ -296,6 +340,7 @@ export function buildChainTree(word, rules, disabledIds = new Set(), options = {
           isLeaf: false,
           forked: false,
           truncatedFork: true,
+          tooManySimultaneous: truncated,
           steps,
           next: recurse(finalWord, gi + 1),
         }
@@ -306,6 +351,7 @@ export function buildChainTree(word, rules, disabledIds = new Set(), options = {
         cancelled,
         isLeaf: false,
         forked: true,
+        tooManySimultaneous: truncated,
         branches: entries.map(([finalWord, steps]) => ({
           steps,
           next: recurse(finalWord, gi + 1),
