@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { lookupMarkedForms } from '../engine/latinDictionary.js'
-import { loadRules, VARIANTS } from '../engine/latinEvolution.js'
+import { loadRules } from '../engine/latinEvolution.js'
 import { buildChainTree } from '../engine/soundChange.js'
 import WordNode from './WordNode.jsx'
 import ChainTreeView from './ChainTreeView.jsx'
@@ -12,7 +12,6 @@ export default function EvolutionPanel({ term }) {
   const [alternateForms, setAlternateForms] = useState([])
   const [isManual, setIsManual] = useState(false)
   const [manualInput, setManualInput] = useState('')
-  const [variant, setVariant] = useState('french')
   const [disabledRuleIds, setDisabledRuleIds] = useState(() => new Set())
 
   const manualInputRef = useRef(null)
@@ -48,18 +47,12 @@ export default function EvolutionPanel({ term }) {
     }
   }, [term])
 
-  const rules = useMemo(() => loadRules(variant), [variant])
+  const rules = useMemo(() => loadRules(), [])
 
   const tree = useMemo(() => {
     if (!markedForm) return null
     return buildChainTree(markedForm, rules, disabledRuleIds)
   }, [markedForm, rules, disabledRuleIds])
-
-  function handleVariantChange(next) {
-    if (next === variant) return
-    setVariant(next)
-    setDisabledRuleIds(new Set()) // les id de règles ne sont pas partagés entre variantes
-  }
 
   function toggleRule(ruleId) {
     setDisabledRuleIds((prev) => {
@@ -102,37 +95,8 @@ export default function EvolutionPanel({ term }) {
   return (
     <div className="evolution-panel">
       <div className="evolution-header">
-        <p className="list-label">Évolution phonétique (latin → {VARIANTS[variant].label})</p>
-        <div className="variant-switch" role="group" aria-label="Variante d'évolution">
-          {Object.entries(VARIANTS).map(([key, { label }]) => (
-            <button
-              key={key}
-              type="button"
-              className={key === variant ? 'variant-button variant-button--active' : 'variant-button'}
-              onClick={() => handleVariantChange(key)}
-              aria-pressed={key === variant}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <p className="list-label">Évolution phonétique (latin → français)</p>
       </div>
-
-      {variant === 'savoyard' && (
-        <p className="status status--muted">
-          Règles expérimentales reconstituées à partir des particularités dialectales
-          décrites sur{' '}
-          <a
-            href="https://fr.wikipedia.org/wiki/Savoyard_(langue)#Particularit%C3%A9s_dialectales_du_savoyard"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Wikipédia
-          </a>{' '}
-          (src/data/rulesSavoyard.csv) — bifurcation fréquente, une branche par variante
-          régionale documentée (Annecy, Val d'Arly, Maurienne, Tarentaise…).
-        </p>
-      )}
 
       {status === 'loading' && <p className="status">Calcul en cours…</p>}
 

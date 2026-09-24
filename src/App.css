@@ -263,34 +263,6 @@ main {
   flex-wrap: wrap;
 }
 
-.variant-switch {
-  display: flex;
-  gap: 0.3rem;
-}
-
-.variant-button {
-  padding: 0.25rem 0.65rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: white;
-  color: var(--muted);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.8rem;
-  text-transform: capitalize;
-}
-
-.variant-button:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.variant-button--active {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: white;
-}
-
 .manual-form-entry form {
   display: flex;
   flex-direction: column;

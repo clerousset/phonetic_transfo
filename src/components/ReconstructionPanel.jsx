@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { loadRules } from '../engine/latinEvolution.js'
+import { classes, loadRules } from '../engine/latinEvolution.js'
 import { buildReverseRules, buildReverseTree } from '../engine/reverseRules.js'
 import WordNode from './WordNode.jsx'
 import ChainTreeView from './ChainTreeView.jsx'
@@ -10,7 +10,7 @@ export default function ReconstructionPanel() {
   const [disabledRuleIds, setDisabledRuleIds] = useState(() => new Set())
 
   const forwardRules = useMemo(() => loadRules(), [])
-  const reverseRules = useMemo(() => buildReverseRules(forwardRules), [forwardRules])
+  const reverseRules = useMemo(() => buildReverseRules(forwardRules, classes), [forwardRules])
 
   const tree = useMemo(() => {
     if (!submitted) return null

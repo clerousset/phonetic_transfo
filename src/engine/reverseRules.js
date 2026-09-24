@@ -1,127 +1,142 @@
 // Reconstruction d'ancêtres latins possibles à partir d'un mot phonétique
 // français : c'est l'inverse du moteur d'évolution (engine/soundChange.js).
 //
-// Inverser une règle regex arbitraire n'est pas bien défini en général (un
-// Pattern peut décrire un ensemble de chaînes, pas une seule). On se limite
-// donc, volontairement, aux règles qu'on peut inverser SANS deviner :
+// Les règles étant écrites en déclaratif (A > B / L _ R, voir ruleSyntax.js),
+// l'inversion est mécanique : l'inverse de A > B / L _ R est B > A / L _ R.
+// On échange simplement Target et Result, et on laisse le compilateur produire
+// la regex — plus besoin de deviner, à partir du texte d'une regex, ce qui y
+// est cible et ce qui y est contexte.
 //
-// - Règle "littérale" (Pattern est une chaîne fixe, éventuellement ancrée en
-//   `^` et/ou `$`, sans aucun autre caractère spécial de regex, et
-//   Replacement ne dépend pas de groupes capturés `\1`, `\2`…) : on cherche
-//   le Replacement dans le mot courant et on le remet tel quel en Pattern.
-// - Règle de suppression littérale et ancrée (Pattern littéral ancré,
-//   Replacement vide, ex. "^h" -> "") : on ne sait pas si la lettre a
-//   vraiment disparu ici — on propose donc les deux possibilités (réinsérée
-//   / pas réinsérée), ce qui crée une bifurcation.
-// - Toute règle avec classes de caractères, lookaheads/lookbehinds, quantif-
-//   icateurs ou rétro-références est ignorée : tenter de l'inverser
-//   "au pif" produirait des ancêtres plausibles en apparence mais faux.
+// Le contexte reste valide en sens inverse parce qu'il n'est jamais consommé :
+// une règle ne modifie que sa cible, donc L et R sont encore là après coup.
 //
-// Les règles retenues sont triées par Date **décroissante** (on défait la
-// dernière chose arrivée en premier) et regroupées par Date comme à l'aller ;
-// buildReverseTree réutilise la même idée d'arbre que buildChainTree, mais
-// sans tester les permutations (moins pertinent ici) — une bifurcation
-// apparaît dès que plusieurs règles du même groupe de Date proposent des
-// résultats distincts pour le mot courant.
+// Trois formes d'inverse, selon la règle de départ :
+//
+// - A > B (les deux non vides) : on cherche B en contexte et on remet A.
+//   Si A désigne une classe ou une alternative ({b,w}, V…), on ne sait pas
+//   lequel de ses membres était là : on produit une règle inverse par membre,
+//   et l'arbre bifurque. C'est une vraie ambiguïté — deux sons d'origine ont
+//   fusionné en un seul — pas un défaut de l'outil.
+// - A > ∅ (effacement) : on ne sait pas si l'effacement a eu lieu ici. On
+//   propose donc les deux hypothèses, réinséré / pas réinséré.
+// - ∅ > B (insertion) : on retire B là où le contexte s'y prête.
+//
+// Restent hors de portée : les règles à échappatoire `Regex` (pas de
+// description déclarative), et celles dont la cible est une séquence complexe
+// (quantificateur, négation) dont on ne saurait pas quoi restituer.
 
+import { compileRule, parseSequence } from './ruleSyntax.js'
 import { groupRulesByDate } from './soundChange.js'
 
-const METACHARS = /[.*+?^${}()|[\]\\]/
+/** Nombre maximum de membres d'une classe qu'on accepte de déplier. */
+const MAX_MEMBRES = 4
 
-function literalCore(pattern) {
-  let core = pattern
-  let anchoredStart = false
-  let anchoredEnd = false
-  if (core.startsWith('^')) {
-    anchoredStart = true
-    core = core.slice(1)
+/**
+ * Si `source` désigne une cible restituable, retourne la liste des chaînes
+ * possibles ; sinon null.
+ *
+ * - "oe"      -> ['oe']            littéral
+ * - "{b,w}"   -> ['b', 'w']        alternative : une origine par membre
+ * - "V"       -> ['a', 'e', …]     classe, si elle n'a pas trop de membres
+ * - "C?V"     -> null              on ne saurait pas quoi remettre
+ */
+function ciblesPossibles(source, classes) {
+  const text = (source ?? '').trim()
+  if (text === '') return ['']
+
+  let elements
+  try {
+    elements = parseSequence(text)
+  } catch {
+    return null
   }
-  if (core.endsWith('$')) {
-    anchoredEnd = true
-    core = core.slice(0, -1)
+
+  if (elements.some((element) => element.quantifier || element.negated)) return null
+
+  if (elements.every((element) => element.kind === 'literal')) {
+    return [elements.map((element) => element.value).join('')]
   }
-  if (core.length === 0) return null
-  if (METACHARS.test(core)) return null
-  return { core, anchoredStart, anchoredEnd }
-}
 
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
+  // un seul élément, classe ou alternative : on déplie ses membres
+  if (elements.length === 1) {
+    const [element] = elements
+    if (element.kind === 'class') {
+      const members = classes.get(element.value)
+      if (members && members.length <= MAX_MEMBRES) return members
+      return null
+    }
+    if (element.kind === 'alternation') {
+      const branches = element.value
+      if (branches.length > MAX_MEMBRES) return null
+      // chaque branche doit elle-même être un littéral
+      if (branches.some((branch) => ciblesPossibles(branch, classes)?.length !== 1)) return null
+      return branches
+    }
+  }
 
-function escapeDollar(s) {
-  return s.replace(/\$/g, '$$$$')
+  return null
 }
 
 /**
- * Construit, à partir des règles d'évolution (aller), le sous-ensemble
- * inversible, sous forme de règles "retour" triées par Date décroissante.
+ * Construit, à partir des règles d'évolution (aller), les règles "retour",
+ * triées par Date décroissante — on défait la dernière chose arrivée en
+ * premier.
  *
- * @param {ReturnType<typeof import('./soundChange.js').parseRules>} forwardRules
+ * @param {Array<{declarative: object|null, date: number, explanation: string, id: number|string}>} forwardRules
+ * @param {Map<string, string[]>} classes
  */
-export function buildReverseRules(forwardRules) {
+export function buildReverseRules(forwardRules, classes) {
   const reverse = []
 
   for (const rule of forwardRules) {
-    if (!rule.regex) continue
+    const declaration = rule.declarative
+    if (!declaration) continue // règle gardée en regex brute : pas inversible
 
-    const lit = literalCore(rule.pattern)
-    if (!lit) continue // Pattern pas une simple chaîne (éventuellement ancrée)
+    const origines = ciblesPossibles(declaration.Target, classes)
+    if (origines === null) continue
 
-    const hasBackref = /\\\d/.test(rule.rawReplacement ?? '')
-    if (hasBackref) continue // Replacement dépend du contexte capturé
+    const aboutissement = (declaration.Result ?? '').trim()
 
-    const replacementLiteral = rule.rawReplacement ?? ''
+    for (const origine of origines) {
+      // l'inverse : on cherche l'aboutissement, on remet l'origine
+      let compiled
+      try {
+        compiled = compileRule(
+          { Target: declaration.Result, Result: origine, Left: declaration.Left, Right: declaration.Right },
+          classes,
+        )
+      } catch {
+        continue
+      }
 
-    if (replacementLiteral.length === 0) {
-      // Règle de suppression : seulement inversible si ancrée (position
-      // unique et bien définie où réinsérer le texte disparu).
-      if (!lit.anchoredStart && !lit.anchoredEnd) continue
+      let regex
+      try {
+        regex = new RegExp(compiled.pattern, 'g')
+      } catch {
+        continue
+      }
+
+      const id = origines.length > 1 ? `${rule.id}-${origine}` : rule.id
+      const explanation =
+        origines.length > 1 ? `${rule.explanation} (origine possible : ${origine})` : rule.explanation
 
       reverse.push({
-        id: rule.id,
+        id,
         date: rule.date,
-        kind: 'optional-insert',
-        explanation: rule.explanation,
-        insertText: lit.core,
-        anchoredStart: lit.anchoredStart,
-        anchoredEnd: lit.anchoredEnd,
+        // un aboutissement vide veut dire que la règle aller effaçait quelque
+        // chose : sa réinsertion est une hypothèse, pas une certitude
+        kind: aboutissement === '' ? 'optional-insert' : 'substitute',
+        explanation,
+        regex,
+        replacement: compiled.replacement,
       })
-      continue
     }
-
-    const searchPattern =
-      (lit.anchoredStart ? '^' : '') +
-      escapeRegExp(replacementLiteral) +
-      (lit.anchoredEnd ? '$' : '')
-
-    let regex
-    try {
-      regex = new RegExp(searchPattern, 'g')
-    } catch {
-      continue
-    }
-
-    reverse.push({
-      id: rule.id,
-      date: rule.date,
-      kind: 'substitute',
-      explanation: rule.explanation,
-      regex,
-      replacement: escapeDollar(lit.core),
-    })
   }
 
   return reverse.sort((a, b) => b.date - a.date)
 }
 
-function insertLiteral(word, rule) {
-  if (rule.anchoredStart) return rule.insertText + word
-  if (rule.anchoredEnd) return word + rule.insertText
-  return word
-}
-
-function safeSubstitute(word, rule) {
+function safeApply(word, rule) {
   try {
     return word.replace(rule.regex, rule.replacement)
   } catch {
@@ -129,14 +144,20 @@ function safeSubstitute(word, rule) {
   }
 }
 
-const DEFAULT_MAX_EXTRA_BRANCHES = 30 // plus permissif qu'à l'aller : la
-// reconstruction inverse est censée beaucoup bifurquer.
+const DEFAULT_MAX_EXTRA_BRANCHES = 30 // la reconstruction est censée bifurquer
+
+// Chaque effacement du sens aller a PU ne pas avoir eu lieu, donc chacun ouvre
+// une hypothèse de restitution. Prises une à une elles sont légitimes ; cumulées
+// sur les vingt effacements du jeu de règles, elles fabriquent des ancêtres
+// absurdes, hérissés de consonnes restituées partout. On borne donc le nombre
+// de restitutions admises le long d'un même chemin : au-delà, seule
+// l'hypothèse « rien à restituer ici » est explorée.
+const DEFAULT_MAX_RESTORATIONS = 2
 
 /**
- * Construit l'arbre des ancêtres possibles de `word`, en remontant les
- * règles inversibles par Date décroissante. Même forme de nœud que
- * buildChainTree (voir soundChange.js), avec `cancelled: []` toujours vide
- * (pas de notion de règle "désactivée mais qui aurait matché" ici).
+ * Construit l'arbre des ancêtres possibles de `word`, en remontant les règles
+ * inversibles par Date décroissante. Même forme de nœud que buildChainTree
+ * (voir soundChange.js), avec `cancelled: []` toujours vide.
  *
  * @param {string} word
  * @param {ReturnType<typeof buildReverseRules>} reverseRules
@@ -146,71 +167,73 @@ const DEFAULT_MAX_EXTRA_BRANCHES = 30 // plus permissif qu'à l'aller : la
 export function buildReverseTree(word, reverseRules, disabledIds = new Set(), options = {}) {
   const groups = groupRulesByDate(reverseRules)
   const branchBudget = { remaining: options.maxExtraBranches ?? DEFAULT_MAX_EXTRA_BRANCHES }
+  const maxRestorations = options.maxRestorations ?? DEFAULT_MAX_RESTORATIONS
 
-  function recurse(currentWord, groupIndex) {
+  function recurse(currentWord, groupIndex, restorations) {
     for (let gi = groupIndex; gi < groups.length; gi++) {
       const group = groups[gi]
+      // `outcomes` : mot obtenu -> { step, restored }. L'hypothèse conservatrice
+      // (ne rien restituer) est insérée en premier pour que la branche la plus
+      // sobre vienne en tête de l'arbre.
       const outcomes = new Map()
 
       for (const rule of group) {
         if (disabledIds.has(rule.id)) continue
 
-        if (rule.kind === 'substitute') {
-          const candidate = safeSubstitute(currentWord, rule)
-          if (candidate !== currentWord && !outcomes.has(candidate)) {
-            outcomes.set(candidate, {
-              ruleId: rule.id,
-              date: rule.date,
-              explanation: rule.explanation,
-              before: currentWord,
-              after: candidate,
-            })
-          }
-        } else {
-          const inserted = insertLiteral(currentWord, rule)
-          if (inserted !== currentWord) {
-            if (!outcomes.has(inserted)) {
-              outcomes.set(inserted, {
-                ruleId: `${rule.id}-insert`,
-                date: rule.date,
-                explanation: `${rule.explanation} (réinséré)`,
-                before: currentWord,
-                after: inserted,
-              })
-            }
-            if (!outcomes.has(currentWord)) {
-              outcomes.set(currentWord, {
+        const candidate = safeApply(currentWord, rule)
+        if (candidate === currentWord) continue
+
+        if (rule.kind === 'optional-insert') {
+          if (!outcomes.has(currentWord)) {
+            outcomes.set(currentWord, {
+              restored: false,
+              step: {
                 ruleId: `${rule.id}-skip`,
                 date: rule.date,
-                explanation: `${rule.explanation} (pas réinséré ici)`,
+                explanation: `${rule.explanation} (rien à restituer ici)`,
                 before: currentWord,
                 after: currentWord,
-              })
-            }
+              },
+            })
           }
+          if (restorations >= maxRestorations) continue // budget épuisé
+        }
+
+        if (!outcomes.has(candidate)) {
+          outcomes.set(candidate, {
+            restored: rule.kind === 'optional-insert',
+            step: {
+              ruleId: rule.kind === 'optional-insert' ? `${rule.id}-insert` : rule.id,
+              date: rule.date,
+              explanation: rule.kind === 'optional-insert' ? `${rule.explanation} (restitué)` : rule.explanation,
+              before: currentWord,
+              after: candidate,
+            },
+          })
         }
       }
 
       if (outcomes.size === 0) continue
 
       const entries = [...outcomes.entries()]
+      const descend = ([finalWord, { restored }]) => recurse(finalWord, gi + 1, restorations + (restored ? 1 : 0))
 
       if (entries.length === 1) {
-        const [finalWord, step] = entries[0]
+        const [, { step }] = entries[0]
         return {
           word: currentWord,
           cancelled: [],
           isLeaf: false,
           forked: false,
           steps: [step],
-          next: recurse(finalWord, gi + 1),
+          next: descend(entries[0]),
         }
       }
 
       branchBudget.remaining -= entries.length - 1
 
       if (branchBudget.remaining < 0) {
-        const [finalWord, step] = entries[0]
+        const [, { step }] = entries[0]
         return {
           word: currentWord,
           cancelled: [],
@@ -218,7 +241,7 @@ export function buildReverseTree(word, reverseRules, disabledIds = new Set(), op
           forked: false,
           truncatedFork: true,
           steps: [step],
-          next: recurse(finalWord, gi + 1),
+          next: descend(entries[0]),
         }
       }
 
@@ -227,9 +250,9 @@ export function buildReverseTree(word, reverseRules, disabledIds = new Set(), op
         cancelled: [],
         isLeaf: false,
         forked: true,
-        branches: entries.map(([finalWord, step]) => ({
-          steps: [step],
-          next: recurse(finalWord, gi + 1),
+        branches: entries.map((entry) => ({
+          steps: [entry[1].step],
+          next: descend(entry),
         })),
       }
     }
@@ -237,5 +260,5 @@ export function buildReverseTree(word, reverseRules, disabledIds = new Set(), op
     return { word: currentWord, cancelled: [], isLeaf: true }
   }
 
-  return recurse(word, 0)
+  return recurse(word, 0, 0)
 }

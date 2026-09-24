@@ -1,5 +1,6 @@
 // Moteur d'évolution phonétique piloté par des règles ordonnées chronologiquement
-// (fichier src/data/rulesStress.csv : colonnes Pattern, Replacement, Explanation, Date).
+// (fichiers src/data/rulesFrench.csv et rulesLatinPhonetic.csv, format déclaratif
+// A > B / L _ R — voir ruleSyntax.js).
 //
 // Principe : on part d'un mot, on trie les règles par Date croissante, puis pour
 // chaque règle on regarde si son Pattern (regex) est trouvé dans le mot courant ;
@@ -20,7 +21,7 @@ function parseDate(raw) {
 // Le CSV écrit les rétro-références à la façon Perl/Python (\1, \2…), mais
 // String.prototype.replace attend la syntaxe $1, $2… On échappe d'abord les
 // éventuels "$" littéraux, puis on convertit \N en $N.
-function toJsReplacement(replacement) {
+export function toJsReplacement(replacement) {
   return replacement.replace(/\$/g, '$$$$').replace(/\\(\d+)/g, '$$$1')
 }
 
@@ -77,6 +78,7 @@ export function computeChain(word, rules, disabledIds = new Set()) {
 
   for (const rule of rules) {
     if (!rule.regex) continue // pattern invalide, ignoré
+    if (rule.condition && !rule.condition(current)) continue // Condition non remplie
 
     let candidate
     try {
@@ -127,6 +129,9 @@ export function brokenRules(rules) {
 // mêmes caractères), pas de bifurcation visible.
 
 function safeApply(word, rule) {
+  // Une Condition porte sur le mot entier (ex. "syllables>1", là où un
+  // contexte local ne suffit pas) : elle se vérifie avant le remplacement.
+  if (rule.condition && !rule.condition(word)) return word
   try {
     return word.replace(rule.regex, rule.replacement)
   } catch {
@@ -225,6 +230,25 @@ export function buildChainTree(word, rules, disabledIds = new Set(), options = {
           wouldBe: after,
         }))
       if (disabledMatching.length > 0) cancelled = [...cancelled, ...disabledMatching]
+
+      // Groupe séquentiel (passe de transcription, voir latinEvolution.js) :
+      // ses règles ne sont pas concurrentes, elles se nourrissent l'une
+      // l'autre. On les applique donc dans l'ordre du fichier, sans filtrer
+      // au préalable sur ce qui matche à l'entrée du groupe — sinon une règle
+      // rendue applicable par sa voisine serait écartée pour toujours — et
+      // sans tester d'autres ordres, qui n'auraient pas de sens ici.
+      if (valid.length > 0 && valid.every((r) => r.sequential)) {
+        const { word: nextWord, steps } = stepsInOrder(word, enabled)
+        if (steps.length === 0) continue
+        return {
+          word,
+          cancelled,
+          isLeaf: false,
+          forked: false,
+          steps,
+          next: recurse(nextWord, gi + 1),
+        }
+      }
 
       const matching = enabled.filter((r) => safeApply(word, r) !== word)
       if (matching.length === 0) continue // rien ici, groupe de date suivant

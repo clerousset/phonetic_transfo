@@ -9,7 +9,7 @@
 // un vrai moteur audio (voir README). Les symboles non standards utilisés en
 // interne par le CSV de règles (ex. le ̬ qui marque une palatalisation en
 // cours, censé disparaître avant la fin de la chaîne) et les artefacts de
-// données non convertis par rules_latin_phonetic.csv (voyelles marquées non
+// données non convertis par rulesLatinPhonetic.csv (voyelles marquées non
 // couvertes, majuscules de noms propres...) sont abandonnés silencieusement
 // plutôt que d'interrompre la synthèse.
 

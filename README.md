@@ -32,28 +32,34 @@ a aussi un bouton 🔊 expérimental pour tenter une prononciation (voir
 
 - `src/data/dico_latin.csv` associe un mot latin (`entries_for_search`, non
   accentué) à sa forme avec voyelles longues/brèves marquées (`entries`,
-  ex. `ingĕnĭum`) — nécessaire car `rules_latin_phonetic.csv` convertit
+  ex. `ingĕnĭum`) — nécessaire car `rulesLatinPhonetic.csv` convertit
   justement ā/ă/ē/ĕ/ī/ĭ/ō/ŏ/ū/ŭ en symboles phonétiques.
-- `src/data/rules_latin_phonetic.csv` (conversion orthographe latine →
-  réalisation phonétique de départ + accent) et `src/data/rulesStress.csv`
-  (évolution vers le français) listent des règles `Pattern` (regex) →
-  `Replacement` (avec rétro-références `\1`, `\2`…), chacune datée (`Date`,
-  `-inf` en premier). Les deux fichiers sont fusionnés et triés par Date
-  croissante, puis les règles sont appliquées une à une : si le Pattern est
-  trouvé dans le mot courant, le Replacement est substitué **partout où il
-  matche** (pas seulement à la première occurrence) et le résultat devient
-  le mot courant pour la règle suivante.
+- `src/data/rulesLatinPhonetic.csv` (conversion orthographe latine →
+  réalisation phonétique de départ + accent) et `src/data/rulesFrench.csv`
+  (évolution vers le français) écrivent les règles en notation linguistique,
+  `A > B / L _ R` : colonnes `Target` (ce qui change), `Result` (ce que ça
+  devient), `Left` et `Right` (le contexte, vérifié mais jamais modifié),
+  plus `Condition` et `Date`. `src/data/classes.csv` définit les classes
+  nommées (`V`, `C`…) auxquelles les règles se réfèrent. Le détail de la
+  syntaxe est dans `CLAUDE.md`.
+- Les deux fichiers sont fusionnés et triés par `Date` croissante, puis les
+  règles sont appliquées une à une : si la règle mord sur le mot courant,
+  elle s'applique **partout où son contexte est réuni** (pas seulement à la
+  première occurrence) et le résultat devient le mot courant pour la règle
+  suivante.
 - Quand plusieurs règles partagent la même Date, leur ordre n'est pas défini
   a priori : le moteur teste tous les ordres possibles (jusqu'à 6 règles
   simultanées) ; s'ils divergent, la chaîne se divise en plusieurs branches
   affichées côte à côte.
 - `src/engine/csv.js` — parseur CSV (guillemets, `""` échappé).
-- `src/engine/soundChange.js` — `parseRules()`, `groupRulesByDate()` et
+- `src/engine/ruleSyntax.js` — le format : compile `A > B / L _ R` en la regex
+  que le moteur exécute. Le contexte étant vérifié mais jamais consommé, les
+  rétro-références sont inutiles et l'inversion devient mécanique.
+- `src/engine/soundChange.js` — `computeChain()`, `groupRulesByDate()` et
   `buildChainTree()` : le moteur générique (arbre de dérivation avec
-  bifurcations), convertit aussi `\1`→`$1` pour `String.replace`. Une règle
-  dont le Pattern n'est pas une regex JS valide est ignorée silencieusement
-  plutôt que de faire planter le calcul (une règle du CSV actuel, `(?)`, est
-  dans ce cas).
+  bifurcations).
+- `src/engine/reverseRules.js` — le sens inverse : échange `Target` et
+  `Result` pour remonter d'un mot français vers ses ancêtres latins possibles.
 - `src/engine/latinDictionary.js` — indexe `dico_latin.csv` (chargé à la
   demande via import dynamique, pour ne pas alourdir le bundle initial).
 - `src/engine/latinEvolution.js` — charge et fusionne les deux CSV de règles,
@@ -72,8 +78,9 @@ ingenium/
 │   ├── data/
 │   │   ├── latinWords.js             # liste d'exemples proposée sur l'accueil
 │   │   ├── dico_latin.csv            # mot -> forme marquée (ā, ă…)
-│   │   ├── rules_latin_phonetic.csv  # latin -> phonétique de départ + accent
-│   │   └── rulesStress.csv           # évolution phonétique vers le français
+│   │   ├── classes.csv               # classes nommées (V, C, C_SANS_L…)
+│   │   ├── rulesLatinPhonetic.csv    # latin -> phonétique de départ + accent
+│   │   └── rulesFrench.csv           # évolution phonétique vers le français
 │   ├── api/wiktionary.js        # client REST (définitions) + opensearch (suggestions)
 │   ├── engine/                  # moteur d'évolution phonétique + prononciation (voir plus bas)
 │   └── components/
@@ -124,7 +131,7 @@ Pourquoi ce n'est qu'une approximation, même si ça fonctionne techniquement :
 - Certains symboles utilisés dans les CSV de règles sont propres à ce projet
   (ex. le `̬` qui marque une palatalisation *en cours*, censé disparaître
   avant la fin de la chaîne) ou sont des résidus non convertis (voyelles
-  marquées absentes de `rules_latin_phonetic.csv`, majuscules de noms
+  marquées absentes de `rulesLatinPhonetic.csv`, majuscules de noms
   propres). Le convertisseur les abandonne silencieusement plutôt que de
   planter, donc le rendu peut perdre en fidélité sur ces mots-là.
 - `src/engine/pronounce.js` relance une instance eSpeak-NG à chaque clic

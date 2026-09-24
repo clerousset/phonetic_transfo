@@ -1,38 +1,45 @@
-// Charge et fusionne les deux jeux de règles d'évolution phonétique :
-// rules_latin_phonetic.csv (conversion de l'orthographe latine en réalisation
-// phonétique de départ + accent) puis un second jeu de règles selon la
-// variante choisie — rulesStress.csv (évolution vers le français) ou
-// rulesSavoyard.csv (évolution vers le savoyard, voir README). Fusionnées et
-// triées par Date croissante, comme un seul fichier.
+// Charge et fusionne les deux jeux de règles d'évolution phonétique, tous deux
+// écrits en déclaratif (A > B / L _ R, voir ruleSyntax.js) :
 //
-// Chaque règle reçoit un `id` stable (son index dans la liste fusionnée
-// triée, propre à chaque variante), utilisé par l'UI pour savoir quelles
-// règles l'utilisateur a désactivées (voir EvolutionPanel.jsx et
-// engine/soundChange.js#computeChain).
+//   rulesLatinPhonetic.csv  orthographe latine -> réalisation phonétique de
+//                           départ, puis placement de l'accent
+//   rulesFrench.csv         évolution phonétique vers le français
+//
+// classes.csv définit les classes nommées (V, C, C_SANS_L…) auxquelles les
+// deux fichiers se réfèrent.
+//
+// Fusionnées et triées par Date croissante, comme un seul fichier. Chaque
+// règle reçoit un `id` stable (son index dans la liste triée), utilisé par
+// l'UI pour savoir quelles règles l'utilisateur a désactivées (voir
+// EvolutionPanel.jsx et engine/soundChange.js#computeChain).
 
-import phoneticCsvRaw from '../data/rules_latin_phonetic.csv?raw'
-import stressCsvRaw from '../data/rulesStress.csv?raw'
-import savoyardCsvRaw from '../data/rulesSavoyard.csv?raw'
-import { parseRules } from './soundChange.js'
+import classesCsvRaw from '../data/classes.csv?raw'
+import phoneticCsvRaw from '../data/rulesLatinPhonetic.csv?raw'
+import frenchCsvRaw from '../data/rulesFrench.csv?raw'
+import { parseCsvObjects } from './csv.js'
+import { parseDeclarativeRules, parseClasses } from './ruleSyntax.js'
 
-export const VARIANTS = {
-  french: { label: 'français', csv: stressCsvRaw },
-  savoyard: { label: 'savoyard', csv: savoyardCsvRaw },
-}
+/** Classes nommées (V, C, C_SANS_L…) auxquelles les règles se réfèrent. */
+export const classes = parseClasses(parseCsvObjects(classesCsvRaw))
 
-const rulesCacheByVariant = new Map()
+let cachedRules = null
 
 /**
- * @param {keyof typeof VARIANTS} [variant]
- * @returns {ReturnType<typeof parseRules>} règles fusionnées, triées, avec id
+ * @returns {ReturnType<typeof parseDeclarativeRules>} règles fusionnées,
+ *   triées, avec un `id`
  */
-export function loadRules(variant = 'french') {
-  if (!rulesCacheByVariant.has(variant)) {
-    const csv = (VARIANTS[variant] ?? VARIANTS.french).csv
-    const rules = [...parseRules(phoneticCsvRaw), ...parseRules(csv)]
+export function loadRules() {
+  if (!cachedRules) {
+    // rulesLatinPhonetic.csv n'est pas un jeu de changements concurrents mais
+    // une passe de transcription ordonnée, où une règle rend la suivante
+    // applicable (l'accent ne peut se poser qu'une fois les voyelles marquées
+    // transcrites). On la marque comme telle pour que buildChainTree
+    // l'applique dans l'ordre du fichier au lieu de la traiter comme un
+    // groupe de règles simultanées (voir soundChange.js).
+    const phoneticRules = parseDeclarativeRules(phoneticCsvRaw, classes).map((rule) => ({ ...rule, sequential: true }))
+    cachedRules = [...phoneticRules, ...parseDeclarativeRules(frenchCsvRaw, classes)]
       .sort((a, b) => a.date - b.date)
       .map((rule, i) => ({ ...rule, id: i }))
-    rulesCacheByVariant.set(variant, rules)
   }
-  return rulesCacheByVariant.get(variant)
+  return cachedRules
 }
