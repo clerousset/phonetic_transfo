@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { lookupMarkedForms } from '../engine/latinDictionary.js'
 import { loadRules } from '../engine/latinEvolution.js'
-import { buildChainTree } from '../engine/soundChange.js'
-import WordNode from './WordNode.jsx'
+import { buildSegments, walk } from '../engine/languageGraph.js'
 import ChainTreeView from './ChainTreeView.jsx'
+import LanguageCard from './LanguageCard.jsx'
 import VowelKeyboard from './VowelKeyboard.jsx'
 
 export default function EvolutionPanel({ term }) {
@@ -13,6 +13,7 @@ export default function EvolutionPanel({ term }) {
   const [isManual, setIsManual] = useState(false)
   const [manualInput, setManualInput] = useState('')
   const [disabledRuleIds, setDisabledRuleIds] = useState(() => new Set())
+  const [choices, setChoices] = useState([])
 
   const manualInputRef = useRef(null)
 
@@ -29,6 +30,7 @@ export default function EvolutionPanel({ term }) {
     setIsManual(false)
     setManualInput(term)
     setDisabledRuleIds(new Set())
+    setChoices([])
 
     lookupMarkedForms(term).then((matches) => {
       if (cancelled) return
@@ -48,11 +50,21 @@ export default function EvolutionPanel({ term }) {
   }, [term])
 
   const rules = useMemo(() => loadRules(), [])
+  const segments = useMemo(() => buildSegments(rules), [rules])
 
-  const tree = useMemo(() => {
+  const steps = useMemo(() => {
     if (!markedForm) return null
-    return buildChainTree(markedForm, rules, disabledRuleIds)
-  }, [markedForm, rules, disabledRuleIds])
+    return walk(markedForm, 'latin', choices, segments, disabledRuleIds)
+  }, [markedForm, choices, segments, disabledRuleIds])
+
+  // Choisir une langue a l'etape `index` remplace tout ce qui suivait.
+  function chooseAt(index, destination) {
+    setChoices((prev) => {
+      const next = prev.slice(0, index)
+      if (prev[index] !== destination) next.push(destination)
+      return next
+    })
+  }
 
   function toggleRule(ruleId) {
     setDisabledRuleIds((prev) => {
@@ -85,6 +97,7 @@ export default function EvolutionPanel({ term }) {
     const value = manualInput.trim()
     if (!value) return
     setDisabledRuleIds(new Set())
+    setChoices([])
     setIsManual(true)
     setMarkedForm(value)
     setStatus('ready')
@@ -134,7 +147,7 @@ export default function EvolutionPanel({ term }) {
         </div>
       )}
 
-      {status === 'ready' && tree && (
+      {status === 'ready' && steps && (
         <>
           <p className="status status--muted">
             Cliquez sur une flèche pour annuler (ou rétablir) la règle correspondante — la suite
@@ -149,9 +162,17 @@ export default function EvolutionPanel({ term }) {
             </p>
           )}
 
-          <div className="word-chain">
-            <WordNode word={markedForm} label="latin" final={tree.isLeaf} />
-            <ChainTreeView node={tree} onToggle={toggleRule} />
+          <div className="language-path">
+            {steps.map((step, index) => (
+              <div key={`${step.language}-${index}`}>
+                <LanguageCard step={step} onChoose={(destination) => chooseAt(index, destination)} />
+                {step.tree && (
+                  <div className="word-chain">
+                    <ChainTreeView node={step.tree} onToggle={toggleRule} />
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
 
           {!isManual && alternateForms.length > 0 && (

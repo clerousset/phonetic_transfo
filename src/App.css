@@ -491,3 +491,75 @@ main {
   text-decoration: none;
   font-style: italic;
 }
+
+/* Parcours de langues : une carte par étape, des pills pour la suite */
+.language-path {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.language-card {
+  border: 1px solid #d7d2c8;
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+  background: #fdfcfa;
+}
+
+.language-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+
+.language-card-name {
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+  color: #6b6357;
+}
+
+.language-card-date {
+  font-size: 0.85rem;
+  color: #948b7d;
+  font-variant-numeric: tabular-nums;
+}
+
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid #cfc8bb;
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.pill:hover {
+  border-color: #a8a093;
+  background: #f6f3ee;
+}
+
+.pill--active {
+  background: #3f3a33;
+  border-color: #3f3a33;
+  color: #fdfcfa;
+}
+
+.pill-count {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}

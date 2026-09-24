@@ -31,6 +31,7 @@ import {
   buildChainTree,
 } from '../src/engine/soundChange.js'
 import { buildReverseRules, buildReverseTree } from '../src/engine/reverseRules.js'
+import { buildSegments, destinationsFrom, walk } from '../src/engine/languageGraph.js'
 
 // --- utilitaires ------------------------------------------------------------
 
@@ -520,5 +521,61 @@ describe('aboutissements français attendus', () => {
   it('mène les 30 mots à leur aboutissement', { todo: 'toit et vaincre n\'y arrivent pas encore (voir ECARTS_CONNUS)' }, () => {
     const got = Object.fromEntries(Object.keys(ABOUTISSEMENTS).map((latin) => [latin, evolue(latin)]))
     assert.deepEqual(got, ABOUTISSEMENTS)
+  })
+})
+
+// --- 10. graphe de langues ---------------------------------------------------
+
+describe('languageGraph', () => {
+  const classes = parseClasses([{ Name: 'V', Members: 'a e o u i' }])
+  const HEAD = '"Target","Result","Left","Right","Condition","Regex","Explanation","Date","LangueDepart","LangueDestination"'
+  const rulesFromLangs = (...lines) =>
+    parseDeclarativeRules([HEAD, ...lines].join('\n'), classes).map((rule, i) => ({ ...rule, id: i }))
+
+  // a -> b, puis b se scinde vers c et d
+  const rules = rulesFromLangs(
+    '"x","y","","","","","x>y","100","a","b"',
+    '"y","z","","","","","y>z","200","b","c"',
+    '"y","w","","","","","y>w","200","b","d"',
+  )
+  const segments = buildSegments(rules)
+
+  it('regroupe les règles par couple de langues', () => {
+    assert.deepEqual(
+      [...segments.values()].map((s) => `${s.from}>${s.to}:${s.rules.length}`),
+      ['a>b:1', 'b>c:1', 'b>d:1'],
+    )
+  })
+
+  it('propose comme pills les langues accessibles depuis la langue courante', () => {
+    assert.deepEqual(destinationsFrom(segments, 'a').map((s) => s.to), ['b'])
+    assert.deepEqual(destinationsFrom(segments, 'b').map((s) => s.to).sort(), ['c', 'd'])
+  })
+
+  it('ne calcule rien tant qu\'aucune pill n\'est choisie', () => {
+    const steps = walk('x', 'a', [], segments)
+    assert.equal(steps.length, 1)
+    assert.equal(steps[0].word, 'x')
+    assert.equal(steps[0].tree, null) // la suite n'est pas explorée
+  })
+
+  it('avance d\'un tronçon par choix, et compose les lignées', () => {
+    const steps = walk('x', 'a', ['b', 'd'], segments)
+    assert.deepEqual(steps.map((s) => [s.language, s.word]), [
+      ['a', 'x'],
+      ['b', 'y'],
+      ['d', 'w'],
+    ])
+  })
+
+  it('porte la date de la dernière règle appliquée', () => {
+    const steps = walk('x', 'a', ['b', 'c'], segments)
+    assert.deepEqual(steps.map((s) => s.date), [null, 100, 200])
+  })
+
+  it('s\'arrête si le choix ne correspond à aucun tronçon', () => {
+    const steps = walk('x', 'a', ['inconnue'], segments)
+    assert.equal(steps.length, 1)
+    assert.equal(steps[0].chosen, null)
   })
 })

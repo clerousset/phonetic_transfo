@@ -309,7 +309,13 @@ export function parseDeclarativeRules(csvText, classes) {
       // règle sans avoir à relire sa regex (voir reverseRules.js).
       const declarative = escapeHatch === '' ? { Target: row.Target ?? '', Result: rawReplacement, Left: row.Left ?? '', Right: row.Right ?? '', Condition: row.Condition ?? '' } : null
 
-      return { pattern, rawReplacement, replacement, explanation, date, regex, condition, declarative }
+      // Couple de langues : les regles partageant le meme couple forment un
+      // troncon (voir languageGraph.js). Les lignees se composent — latin ->
+      // latin phonetique -> francais.
+      const from = (row.LangueDepart ?? '').trim()
+      const to = (row.LangueDestination ?? '').trim()
+
+      return { pattern, rawReplacement, replacement, explanation, date, regex, condition, declarative, from, to }
     })
     .sort((a, b) => a.date - b.date)
 }
